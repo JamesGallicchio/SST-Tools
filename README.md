@@ -9,9 +9,9 @@ A suite of tools and code designed to provide digital support for SST, the writi
 5. Provide a GUI tool to manually construct fonts from smaller images
 
 ## Progress
-[x] .vzk file format with encoding specs
-[x] .sst font format with encoding specs
-[ ] Rendering code to generate images of text
-[ ] GUI Vo'Zaken "text editor"
-[ ] GUI tool to build/edit fonts
-[ ] Documentation of proposed standards
+- [x] .vzk file format with encoding specs
+- [x] .sst font format with encoding specs
+- [ ] Rendering code to generate images of text
+- [ ] GUI Vo'Zaken "text editor"
+- [ ] GUI tool to build/edit fonts
+- [ ] Documentation of proposed standards
