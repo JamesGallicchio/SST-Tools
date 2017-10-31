@@ -1,20 +1,33 @@
-package io.github.jamesgallicchio.sst
-
-import enumeratum.values._
+package io.github.jamesgallicchio.sst.core
 
 import scala.collection.immutable
+import enumeratum.values._
+
+import scala.util.Try
 
 sealed abstract class Codepoint(val value: Byte) extends ByteEnumEntry
 
 case object VzkEncoding extends ByteEnum[Codepoint] {
   val values: immutable.IndexedSeq[Codepoint] = findValues
-  val map: Map[Byte, Codepoint] = Map(values map { c => (c.value, c) }: _*)
+  val codepoints: Map[Byte, Codepoint] = Map(values map { c => (c.value, c) }: _*)
 
-  implicit val int2byte: Int => Byte = _.toByte
+  def interp(seq: Seq[Codepoint], ignoreInvalid: Boolean = false): Try[Seq[VzkChar]] = {
+    Try(
+      seq map {
+        case v: VzkChar => Some(v)
+        case _ if ignoreInvalid => None
+        case _ => throw new IllegalArgumentException("Codepoint sequence contains invalid codepoint!")
+      } filter(_.isDefined) map(_.get)
+    )
+  }
+
+  private implicit val int2byte: Int => Byte = _.toByte
 
   sealed trait VzkChar
 
   // 0x00 to 0x0F: whitespace chars
+  sealed trait Whitespace extends VzkChar
+  case object LineAlternation extends Codepoint(0x0a) with Whitespace
 
   // 0x10 to 0x1F: digits
   sealed trait Digit extends VzkChar
