@@ -1,12 +1,12 @@
-package io.github.jamesgallicchio.sst
+package io.github.jamesgallicchio.sst.core
 
-import javax.imageio.ImageIO
 import java.io.{BufferedOutputStream, File, FileOutputStream}
 import java.util.regex.Pattern
 import java.util.zip.{ZipEntry, ZipFile, ZipOutputStream}
+import javax.imageio.ImageIO
 
-import io.github.jamesgallicchio.sst.SSTFont._
-import io.github.jamesgallicchio.sst.VzkEncoding.{Consonant, Digit, Punctuation, Vowel}
+import io.github.jamesgallicchio.sst.core.SSTFont._
+import io.github.jamesgallicchio.sst.core.VzkEncoding.{Consonant, Digit, Punctuation, Vowel}
 
 import scala.collection.JavaConverters._
 import scala.util.Try
