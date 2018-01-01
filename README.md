@@ -11,7 +11,10 @@ A suite of tools and code designed to provide digital support for SST, the writi
 ## Progress
 - [x] .vzk file format with encoding specs
 - [x] .sst font format with encoding specs
-- [ ] Rendering code to generate images of text
+- [x] Vo'Zaken rendering to generate images of text
+    - [x] Font loading/saving
+    - [x] .vzk document loading/saving
+    - [x] Text rendering
+- [x] Documentation of proposed standards
 - [ ] GUI Vo'Zaken "text editor"
 - [ ] GUI tool to build/edit fonts
-- [ ] Documentation of proposed standards
