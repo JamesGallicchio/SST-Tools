@@ -10,9 +10,6 @@ down by type of character. Only 0x00 - 0x5F have been allocated.
 each character type range has multiple spaces also available for future
 expansion within that character type.
 
-HEX | Character
---- | ---
-
 0x00 - 0x0F | Whitespace
 --- | ---
 0x0a | LineAlternation
@@ -75,7 +72,7 @@ HEX | Character
 0x46 | Thh
 0x47 | Th
 
-0x50 - 0x5F | punctuation
+0x50 - 0x5F | Punctuation
 --- | ---
 0x50 | FullStop
 0x51 | PartialStop
