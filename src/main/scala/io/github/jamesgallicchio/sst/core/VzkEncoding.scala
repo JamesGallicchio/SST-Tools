@@ -1,100 +1,125 @@
 package io.github.jamesgallicchio.sst.core
 
-import scala.collection.immutable
-import enumeratum.values._
-
 import scala.util.Try
 
-sealed abstract class Codepoint(val value: Byte) extends ByteEnumEntry
+case object VzkEncoding {
 
-case object VzkEncoding extends ByteEnum[Codepoint] {
-  val values: immutable.IndexedSeq[Codepoint] = findValues
-  val codepoints: Map[Byte, Codepoint] = Map(values map { c => (c.value, c) }: _*)
+  val map: Map[Byte, VzkChar] = Seq(
 
-  def interp(seq: Seq[Codepoint], ignoreInvalid: Boolean = false): Try[Seq[VzkChar]] = {
+    // 0x00 to 0x0F: whitespace chars
+    0x0a -> LineAlternation,
+
+    // 0x10 to 0x1F: digits
+    0x10 -> z0, 0x11 -> z1, 0x12 -> z2, 0x13 -> z3,
+    0x14 -> z4, 0x15 -> z5, 0x16 -> z6, 0x17 -> z7,
+    0x18 -> z8, 0x19 -> z9, 0x1a -> zX, 0x1b -> zE,
+
+    // 0x20 to 0x2f: vowels
+    0x20 -> A,  0x21 -> Aa, 0x22 -> I,  0x23 -> U,
+    0x24 -> E,  0x25 -> Ey, 0x26 -> O,  0x27 -> Yy,
+    0x28 -> Uu, 0x29 -> Ii, 0x2a -> Oo, 0x2b -> Ao,
+    0x2c -> Oy,
+
+    // 0x30 to 0x4f: consonants
+    0x30 -> F, 0x31 -> B, 0x32 -> P, 0x33 -> Y,
+    0x34 -> L, 0x35 -> R, 0x36 -> W, 0x37 -> M,
+    0x38 -> N, 0x39 -> H, 0x3a -> Z, 0x3b -> S,
+    0x3c -> Jh, 0x3d -> Sh, 0x3e -> Ch, 0x3f -> J,
+    0x40 -> D, 0x41 -> T, 0x42 -> Ng, 0x43 -> G,
+    0x44 -> K, 0x45 -> V, 0x46 -> Thh, 0x47 -> Th,
+
+    // 0x50 to 0x5f: punctuation
+    0x50 -> FullStop,
+    0x51 -> PartialStop,
+    0x52 -> LeanMark,
+    0x53 -> LiterationMark,
+    0x54 -> IndefinitiveMark,
+    0x55 -> DefinitiveMark
+  ).map(e => (e._1.toByte, e._2)).toMap
+
+  val codepoints: Map[VzkChar, Byte] = map.foldLeft(Map.empty[VzkChar, Byte]){ (map, entry) => map + (entry._2 -> entry._1) }
+
+  val chars: Set[VzkChar] = codepoints.keySet
+  val whitespace: Set[Whitespace] = chars.collect { case c: Whitespace => c }
+  val digits: Set[Digit] = chars.collect { case c: Digit => c }
+  val vowels: Set[Vowel] = chars.collect { case c: Vowel => c }
+  val consonants: Set[Consonant] = chars.collect { case c: Consonant => c }
+  val punctuation: Set[Punctuation] = chars.collect { case c: Punctuation => c }
+
+  def interp(seq: Seq[Byte], ignoreInvalid: Boolean = false): Try[Seq[VzkChar]] = {
     Try(
-      seq map {
-        case v: VzkChar => Some(v)
-        case _ if ignoreInvalid => None
-        case _ => throw new IllegalArgumentException("Codepoint sequence contains invalid codepoint!")
-      } filter(_.isDefined) map(_.get)
+      seq.map(map.get) map {
+        case Some(v) => v
+        case None => throw new IllegalArgumentException("Codepoint sequence contains invalid codepoint!")
+      }
     )
   }
 
-  private implicit val int2byte: Int => Byte = _.toByte
+  sealed abstract class VzkChar(val name: String)
 
-  sealed trait VzkChar
+  sealed abstract class Whitespace(name: String) extends VzkChar(name)
+  case object LineAlternation extends Whitespace("LineAlternation")
 
-  // 0x00 to 0x0F: whitespace chars
-  sealed trait Whitespace extends VzkChar
-  case object LineAlternation extends Codepoint(0x0a) with Whitespace
+  sealed abstract class Digit(name: String) extends VzkChar(name)
+  case object z0 extends Digit("z0")
+  case object z1 extends Digit("z1")
+  case object z2 extends Digit("z2")
+  case object z3 extends Digit("z3")
+  case object z4 extends Digit("z4")
+  case object z5 extends Digit("z5")
+  case object z6 extends Digit("z6")
+  case object z7 extends Digit("z7")
+  case object z8 extends Digit("z8")
+  case object z9 extends Digit("z9")
+  case object zX extends Digit("zX")
+  case object zE extends Digit("zE")
 
-  // 0x10 to 0x1F: digits
-  sealed trait Digit extends VzkChar
-  case object z0 extends Codepoint(0x10) with Digit
-  case object z1 extends Codepoint(0x11) with Digit
-  case object z2 extends Codepoint(0x12) with Digit
-  case object z3 extends Codepoint(0x13) with Digit
-  case object z4 extends Codepoint(0x14) with Digit
-  case object z5 extends Codepoint(0x15) with Digit
-  case object z6 extends Codepoint(0x16) with Digit
-  case object z7 extends Codepoint(0x17) with Digit
-  case object z8 extends Codepoint(0x18) with Digit
-  case object z9 extends Codepoint(0x19) with Digit
-  case object zX extends Codepoint(0x1a) with Digit
-  case object zE extends Codepoint(0x1b) with Digit
+  sealed abstract class Vowel(name: String) extends VzkChar(name)
+  case object A extends Vowel("A")
+  case object Aa extends Vowel("Aa")
+  case object I extends Vowel("I")
+  case object U extends Vowel("U")
+  case object E extends Vowel("E")
+  case object Ey extends Vowel("Ey")
+  case object O extends Vowel("O")
+  case object Yy extends Vowel("Yy")
+  case object Uu extends Vowel("Uu")
+  case object Ii extends Vowel("Ii")
+  case object Oo extends Vowel("Oo")
+  case object Ao extends Vowel("Ao")
+  case object Oy extends Vowel("Oy")
 
-  // 0x20 to 0x2f: vowels
-  sealed trait Vowel extends VzkChar
-  case object A extends Codepoint(0x20) with Vowel
-  case object Aa extends Codepoint(0x21) with Vowel
-  case object I extends Codepoint(0x22) with Vowel
-  case object U extends Codepoint(0x23) with Vowel
-  case object E extends Codepoint(0x24) with Vowel
-  case object Ey extends Codepoint(0x25) with Vowel
-  case object O extends Codepoint(0x26) with Vowel
-  case object Yy extends Codepoint(0x27) with Vowel
-  case object Uu extends Codepoint(0x28) with Vowel
-  case object Ii extends Codepoint(0x29) with Vowel
-  case object Oo extends Codepoint(0x2a) with Vowel
-  case object Ao extends Codepoint(0x2b) with Vowel
-  case object Oy extends Codepoint(0x2c) with Vowel
+  sealed abstract class Consonant(name: String) extends VzkChar(name)
+  case object F extends Consonant("F")
+  case object B extends Consonant("B")
+  case object P extends Consonant("P")
+  case object N extends Consonant("N")
+  case object Y extends Consonant("Y")
+  case object R extends Consonant("R")
+  case object W extends Consonant("W")
+  case object L extends Consonant("L")
+  case object M extends Consonant("M")
+  case object S extends Consonant("S")
+  case object H extends Consonant("H")
+  case object Z extends Consonant("Z")
+  case object Jh extends Consonant("Jh")
+  case object Sh extends Consonant("Sh")
+  case object Ch extends Consonant("Ch")
+  case object J extends Consonant("J")
+  case object D extends Consonant("D")
+  case object T extends Consonant("T")
+  case object Ng extends Consonant("Ng")
+  case object G extends Consonant("G")
+  case object K extends Consonant("K")
+  case object V extends Consonant("V")
+  case object Thh extends Consonant("Thh")
+  case object Th extends Consonant("Th")
 
-  // 0x30 to 0x4f: consonants
-  sealed trait Consonant extends VzkChar
-  case object F extends Codepoint(0x30) with Consonant
-  case object B extends Codepoint(0x31) with Consonant
-  case object P extends Codepoint(0x32) with Consonant
-  case object Y extends Codepoint(0x33) with Consonant
-  case object L extends Codepoint(0x34) with Consonant
-  case object R extends Codepoint(0x35) with Consonant
-  case object W extends Codepoint(0x36) with Consonant
-  case object M extends Codepoint(0x37) with Consonant
-  case object N extends Codepoint(0x38) with Consonant
-  case object H extends Codepoint(0x39) with Consonant
-  case object Z extends Codepoint(0x3a) with Consonant
-  case object S extends Codepoint(0x3b) with Consonant
-  case object Jh extends Codepoint(0x3c) with Consonant
-  case object Sh extends Codepoint(0x3d) with Consonant
-  case object Ch extends Codepoint(0x3e) with Consonant
-  case object J extends Codepoint(0x3f) with Consonant
-  case object D extends Codepoint(0x40) with Consonant
-  case object T extends Codepoint(0x41) with Consonant
-  case object Ng extends Codepoint(0x42) with Consonant
-  case object G extends Codepoint(0x43) with Consonant
-  case object K extends Codepoint(0x44) with Consonant
-  case object V extends Codepoint(0x45) with Consonant
-  case object Thh extends Codepoint(0x46) with Consonant
-  case object Th extends Codepoint(0x47) with Consonant
-
-  // 0x50 to 0x5f: punctuation
-  sealed trait Punctuation extends VzkChar
-  case object FullStop extends Codepoint(0x50) with Punctuation
-  case object PartialStop extends Codepoint(0x51) with Punctuation
-  case object LeanMark extends Codepoint(0x52) with Punctuation
-  case object LiterationMark extends Codepoint(0x53) with Punctuation
-  case object IndefinitiveMark extends Codepoint(0x54) with Punctuation
-  case object DefinitiveMark extends Codepoint(0x55) with Punctuation
-
-  // 0x60+: miscellaneous characters
+  sealed abstract class Punctuation(name: String) extends VzkChar(name)
+  case object FullStop extends Punctuation("FullStop")
+  case object PartialStop extends Punctuation("PartialStop")
+  case object LeanMark extends Punctuation("LeanMark")
+  case object LiterationMark extends Punctuation("LiterationMark")
+  case object IndefinitiveMark extends Punctuation("IndefinitiveMark")
+  case object DefinitiveMark extends Punctuation("DefinitiveMark")
 }
