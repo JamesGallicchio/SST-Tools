@@ -1,60 +1,113 @@
 package io.github.jamesgallicchio.sst.core
 
-import java.awt.Image
-import java.awt.image.{BufferedImage, ImageObserver, Raster, RenderedImage}
+import java.awt.{Graphics, Image}
+import java.awt.image.BufferedImage
 
-import io.github.jamesgallicchio.sst.core.SSTFont.{ConsonantGlyph, DigitGlyph, Glyph, VowelGlyph}
 import io.github.jamesgallicchio.sst.core.VzkEncoding.{Consonant, Digit, LineAlternation, Punctuation, Vowel, VzkChar}
 
 import scala.annotation.tailrec
 
-object SSTFont {
-  sealed trait Glyph[T <: VzkChar] {
-    def codepoint: Codepoint with T
-    def image: BufferedImage
-  }
+case class SSTFont(name: String, lineHeight: Int, vowelSpines: Map[Vowel, Seq[(Int, Int)]], consSpines: Map[Consonant, Int],
+                   images: Map[VzkChar, BufferedImage], default: BufferedImage) {
 
-  case class DigitGlyph(codepoint: Codepoint with Digit, image: BufferedImage) extends Glyph[Digit]
-  case class VowelGlyph(codepoint: Codepoint with Vowel, image: BufferedImage, spine: Array[Int]) extends Glyph[Vowel]
-  case class ConsonantGlyph(codepoint: Codepoint with Consonant, image: BufferedImage, spine: Int) extends Glyph[Consonant]
-  case class PunctuationGlyph(codepoint: Codepoint with Punctuation, image: BufferedImage) extends Glyph[Punctuation]
-}
+  def render(g: Graphics, str: Seq[VzkChar], maxWidth: Int = -1): Unit = {
 
-case class SSTFont(name: String, lineHeight: Int, glyphs: Set[Glyph[_]], default: Glyph[_]) {
-  private implicit def charToGlyph[T <: VzkChar](c: Codepoint with T): Glyph[T] = glyphs.collectFirst {
-    case g: Glyph[T] if g.codepoint == c => g
-  }.getOrElse(throw new IllegalStateException("This font is missing a glyph for codepoint " + c.toString))
-
-  def render(str: Seq[VzkChar], maxWidth: Option[Int] = None): Image = {
+    // Loop through characters and render them, keeping track of x and y position
     @tailrec
-    def rec(image: BufferedImage, remaining: Seq[VzkChar], x: Int, y: Int): BufferedImage =
-      remaining.head match {
-        case v: Vowel =>
-          val (lefts, rest) = remaining.tail.span(_.isInstanceOf[Consonant])
-          val (rights, rest2) = rest.head match {
-            case LineAlternation => rest.tail.span(_.isInstanceOf[Consonant])
-            case _ => (Seq.empty, rest)
-          }
-          renderSyllable(v, lefts, rights)
-      }
+    def rec(g: Graphics, x: Int, xMax: Int, y: Int, yIncr: Int, seq: Seq[VzkChar]): Unit = if (seq.nonEmpty) {
 
-    rec(new BufferedImage(maxWidth.getOrElse(100), lineHeight, BufferedImage.TYPE_INT_ARGB), str, 0, 0)
-  }
+      val img = getImage(seq.head)
+      val nextX = x + img.getWidth
 
-  def renderSyllable(vowel: VowelGlyph, left: Seq[ConsonantGlyph], right: Seq[ConsonantGlyph]): BufferedImage = {
-    @tailrec
-    def rec(img: BufferedImage, isLeft: Boolean, cons: Seq[ConsonantGlyph], x: Int): BufferedImage
-      = if (cons.isEmpty) img else {
-          val xp = if (isLeft) x + cons.head.image.getWidth else x - cons.head.image.getWidth
-          val vs = (vowel.spine(x) + vowel.spine(xp))/2
-          img.getGraphics.drawImage(cons.head.image, x, vs - cons.head.spine, null)
-          rec(img, isLeft, cons.tail, xp)
+      // Check if went over line width, go to next line if yes
+      if (nextX > xMax) rec(g, 0, xMax, y + yIncr, yIncr, seq)
+      else {
+
+        // Render head
+        g.drawImage(img, x, y, null)
+
+        // Check for extras & grab remaining elements
+        val remaining = seq.head match {
+          case v: Vowel =>
+            // Grab left and right consonants to draw over vowel
+            val (lefts, rest) = seq.tail.span(_.isInstanceOf[Consonant])
+            val (rights, rest2) = rest.head match {
+              case LineAlternation => rest.tail.span(_.isInstanceOf[Consonant])
+              case _ => (Seq.empty, rest)
+            }
+            renderSyllable(g, x, y, v, lefts.collect { case c: Consonant => c }, rights.collect { case c: Consonant => c })
+            rest2
+          case _ => seq.tail
         }
 
-    val img = vowel.image
-    rec(img, isLeft = true, left, 0)
-    rec(img, isLeft = false, right, img.getWidth)
+        rec(g, nextX, xMax, y, yIncr, remaining)
+      }
+    }
 
-    img
+    rec(g, 0, maxWidth, 0, lineHeight, str)
   }
+
+  private def renderSyllable(g: Graphics, xOff: Int, yOff: Int,
+                     vowel: Vowel, left: Seq[Consonant], right: Seq[Consonant]): Unit = {
+
+    val vowelImg = getImage(vowel)
+
+    g.drawImage(vowelImg, xOff, yOff, null)
+
+    left.foldLeft(xOff){ (x, e) =>
+      val img = getImage(e)
+      val es = getSpineAt(e)
+      val nextX = x + img.getWidth
+      val vs = (getSpineAt(vowel, x) + getSpineAt(vowel, nextX))/2
+
+      g.drawImage(img, x, vs - es, null)
+
+      nextX
+    }
+    right.foldRight(xOff + vowelImg.getWidth){ (e, x) =>
+      val img = getImage(e)
+      val es = getSpineAt(e)
+      val nextX = x - img.getWidth
+      val vs = (getSpineAt(vowel, x) + getSpineAt(vowel, nextX))/2
+
+      g.drawImage(img, x, vs - es, null)
+
+      nextX
+    }
+  }
+
+  def getImage(vch: VzkChar): BufferedImage = images.getOrElse(vch, default)
+
+  // Gets spine height at some x value within the image
+  private def getSpineAt(vow: Vowel, x: Int): Int = vowelSpines.get(vow).flatMap { spine =>
+
+      // Find the defined points on the left and right of the specified x
+      def consume(data: Seq[(Int, Int)], target: Int): Option[Int] = data match {
+
+        // If the data is empty, no well defined answer
+        case e if e.isEmpty => None
+
+        // Only one element, so take that element's value
+        case Seq(e) => Some(e._2)
+
+        // Found the containing points, so calculate value at target on line between points
+        case seq if seq.head._1 <= target && target <= seq.tail.head._1 =>
+          val (x1, y1) = seq.head
+          val (x2, y2) = seq.tail.head
+          Some(
+            //   slope      *   delta x   + y(init)
+            (y1-y2)/(x1-x2) * (target-x1) + y1
+          )
+
+        case seq => consume(seq.tail, target)
+      }
+      consume(spine, x)
+    }.getOrElse(0)
+
+  private def getSpineAt(cons: Consonant): Int = consSpines.getOrElse(cons, 0)
+
+  def copy(name: String = this.name, lineHeight: Int = this.lineHeight,
+                          vowelSpines: Map[Vowel, Seq[(Int, Int)]] = this.vowelSpines, consSpines: Map[Consonant, Int] = this.consSpines,
+                          images: Map[VzkChar, BufferedImage] = this.images, default: BufferedImage = this.default
+    ): SSTFont = SSTFont(name, lineHeight, vowelSpines, consSpines, images, default)
 }
