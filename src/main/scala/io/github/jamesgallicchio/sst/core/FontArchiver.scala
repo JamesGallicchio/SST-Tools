@@ -16,8 +16,8 @@ FileName.sst: ZIP
 |- config: TEXT (UTF-8)
 |    > name=Font Name
 |    > line-height=XX
-|    > a=XX,YY;XX,YY;XX,YY
-|    > p=XX
+|    > a=BB:XX,YY;XX,YY;XX,YY
+|    > p=BB
 |    > ...
 |
 |- aa.*: IMAGE
@@ -29,6 +29,7 @@ FileName.sst: ZIP
 object FontArchiver {
 
   val configLine: Regex = """(.+)=(.+)""".r
+  val vowel: Regex = """(\d+)(?:\:([0-9,;]*))?""".r
   val vowelSpine: Regex = """(\d+),(\d+)""".r
   val imageFile: Regex = """(.+)\..+""".r
 
@@ -36,10 +37,10 @@ object FontArchiver {
     val zip: ZipFile = new ZipFile(archive)
 
     zip.entries.asScala.foldLeft(
-      SSTFont("", 0, Map.empty[Vowel, Seq[(Int, Int)]], Map.empty[Consonant, Int], Map.empty[VzkChar, BufferedImage], null)
+      SSTFont("", 0, 0, Map.empty[Vowel, Seq[(Int, Int)]], Map.empty[VzkChar, Int], Map.empty[VzkChar, BufferedImage], null)
     ) { (font: SSTFont, entry: ZipEntry) =>
 
-      entry.getName match {
+      entry.getName.replaceAll(".*/", "") match {
         // Config file, handle as such
         case "config" =>
           // Read in lines of the file
@@ -56,16 +57,25 @@ object FontArchiver {
                     case "name" => Some(font.copy(name = value))
                     // Configures font line height
                     case "line-height" => Some(font.copy(lineHeight = value.toInt))
+                    case "padding" => Some(font.copy(padding = value.toInt))
 
-                    // Something else- try finding a matching character
-                    case other => VzkEncoding.chars.find(_.name.equalsIgnoreCase(other)).collect {
-                      // Matches consonant, so add to font consSpines
-                      case c: Consonant => font.copy(consSpines = font.consSpines + (c -> value.toInt))
+                    // Something else- try finding a matching character (or else None)
+                    case other => VzkEncoding.chars.find(_.name.equalsIgnoreCase(other)).map {
                       // Matches vowel, so add to font vowelSpines
-                      case v: Vowel => font.copy(vowelSpines = font.vowelSpines + (v ->
-                          // Process int,int;int,int;... into Seq[(Int, Int)]
-                          vowelSpine.findAllMatchIn(value).map(m => (m.group(1).toInt, m.group(2).toInt)).toSeq
-                        ))
+                      case v: Vowel =>
+                        // Process int:int,int;int,int;... into Int, Seq[(Int, Int)]
+                        vowel.findFirstMatchIn(value).map { m =>
+                          // Base
+                          (m.group(1).toInt,
+                            // Spines
+                            Option(m.group(2)).getOrElse("").split(";").toSeq.flatMap(vowelSpine.findFirstMatchIn)
+                              .map { p => (p.group(1).toInt, p.group(2).toInt) })
+                        }.map { case (base, spines) =>
+                          font.copy(vowelSpines = font.vowelSpines + (v -> spines), bases = font.bases + (v -> base))
+                        }.getOrElse(font)
+
+                      // Matches anything else, so add to bases
+                      case c => font.copy(bases = font.bases + (c -> value.toInt))
                     }
                   }
                 // Line didn't match key=value
@@ -103,13 +113,11 @@ object FontArchiver {
         s"name=${font.name}\n" +
         s"line-height=${font.lineHeight}\n" +
 
-        // Vowel spine lines
-        font.vowelSpines.map { case (v, s) =>
-          v.name + "=" + s.map { case (x, y) => s"$x,$y"}.mkString(";")
-        }.mkString("\n") +
-
-        // Consonant spine lines
-        font.consSpines.map { case (c, s) => s"${c.name}=$s" }.mkString("\n")
+        font.bases.map { // char=BB
+          // for vowels, add the :XX,YY;XX,YY...
+          case (v: Vowel, s) => s"${v.name}=$s:" + font.vowelSpines.getOrElse(v, Seq.empty).map { case (x, y) => s"$x,$y" }.mkString(";")
+          case (c, s) => s"${c.name}=$s"
+        }
 
       ).getBytes)
     zip.closeEntry()
