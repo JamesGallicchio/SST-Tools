@@ -1,27 +1,41 @@
 package io.github.jamesgallicchio.sst.core
 
-import java.awt.{Color, Graphics, Image}
+import java.awt.Graphics
 import java.awt.image.BufferedImage
+import javafx.embed.swing.SwingFXUtils
+import javafx.scene.canvas.GraphicsContext
 
-import io.github.jamesgallicchio.sst.core.VzkEncoding.{Consonant, Digit, LineAlternation, Punctuation, Vowel, VzkChar}
+import io.github.jamesgallicchio.sst.core.VzkEncoding.{Consonant, LineAlternation, Vowel, VzkChar}
 
 import scala.annotation.tailrec
 
 case class SSTFont(name: String, lineHeight: Int, padding: Int, vowelSpines: Map[Vowel, Seq[(Int, Int)]],
                    bases: Map[VzkChar, Int], images: Map[VzkChar, BufferedImage], default: BufferedImage) {
 
-  def render(g: Graphics, str: Seq[VzkChar], maxWidth: Int = -1): Unit = {
+  def render(graphics: Graphics, str: Seq[VzkChar], maxWidth: Int): Int = {
+    render(graphics.drawImage(_, _, _, null), str, maxWidth)
+  }
+
+  def render(graphics: GraphicsContext, str: Seq[VzkChar], maxWidth: Int): Int = {
+    render({ (img, x, y) => println("drawing image"); graphics.drawImage(SwingFXUtils.toFXImage(img, null), x, y) }, str, maxWidth)
+  }
+
+  def render(drawer: (BufferedImage, Int, Int) => Unit, str: Seq[VzkChar], maxWidth: Int): Int = {
+
+    println(s"Rendering ${str.mkString(",")} on $maxWidth wide thing")
 
     // Loop through characters and render them, keeping track of x and y position
     @tailrec
-    def rec(g: Graphics, x: Int, xMax: Int, xPad: Int, y: Int, yIncr: Int, seq: Seq[VzkChar]): Unit = if (seq.nonEmpty) {
+    def rec(draw: (BufferedImage, Int, Int) => Unit, x: Int, xMax: Int, xPad: Int, y: Int, yIncr: Int,
+            seq: Seq[VzkChar]): Int = if (seq.nonEmpty) {
 
+      println("rec")
       val img = getImage(seq.head)
-      val nextX = x + img.getWidth + padding
+      val nextX = x + img.getWidth + xPad
 
       // Check if went over line width, go to next line if yes
-      if (xMax >= 0 && img.getWidth < xMax && nextX > xMax) {
-        rec(g, 0, xPad, xMax, y + yIncr, yIncr, seq)
+      if (xMax >= 0 && nextX > xMax && x != xPad) {
+        rec(draw, xPad, xMax, xPad, y + yIncr, yIncr, seq)
       } else {
 
         // Calculate y value to line base up to halfway down line
@@ -38,28 +52,27 @@ case class SSTFont(name: String, lineHeight: Int, padding: Int, vowelSpines: Map
                 case LineAlternation => rest.tail.span(_.isInstanceOf[Consonant])
                 case _ => (Seq.empty, rest)
               }
-            renderSyllable(g, x, baseY, v, lefts.collect { case c: Consonant => c }, rights.collect { case c: Consonant => c })
+            renderSyllable(draw, x, baseY, v, lefts.collect { case c: Consonant => c }, rights.collect { case c: Consonant => c })
             rest2
           case _ =>
             // Render whatever else it is
-            g.drawImage(img, x, baseY, null)
+            draw(img, x, baseY)
             seq.tail
         }
 
-        rec(g, xPad, nextX, xMax, y, yIncr, remaining)
+        rec(draw, nextX, xMax, xPad, y, yIncr, remaining)
       }
-    }
+    } else y+yIncr
 
-    rec(g, padding, padding, maxWidth, 0, lineHeight, str)
+    rec(drawer, padding, maxWidth, padding, 0, lineHeight, str)
   }
 
-  private def renderSyllable(g: Graphics, xOff: Int, yOff: Int,
+  private def renderSyllable(draw: (BufferedImage, Int, Int) => Unit, xOff: Int, yOff: Int,
                      vowel: Vowel, left: Seq[Consonant], right: Seq[Consonant]): Unit = {
 
-    println(s"rendering syllable $left :: $vowel :: $right")
     val vowelImg = getImage(vowel)
 
-    g.drawImage(vowelImg, xOff, yOff, null)
+    draw(vowelImg, xOff, yOff)
 
     left.foldLeft(xOff){ (x, e) =>
       val img = getImage(e)
@@ -69,7 +82,7 @@ case class SSTFont(name: String, lineHeight: Int, padding: Int, vowelSpines: Map
 
       println(s"$x to $nextX: $e ${img.getWidth}")
 
-      g.drawImage(img, x, yOff + vs - es, null)
+      draw(img, x, yOff + vs - es)
 
       nextX
     }
@@ -79,7 +92,7 @@ case class SSTFont(name: String, lineHeight: Int, padding: Int, vowelSpines: Map
       val nextX = x - img.getWidth - padding
       val vs = getSpineAt(vowel, (x+nextX)/2)
 
-      g.drawImage(img, nextX, yOff + vs - es, null)
+      draw(img, nextX, yOff + vs - es)
 
       nextX
     }
