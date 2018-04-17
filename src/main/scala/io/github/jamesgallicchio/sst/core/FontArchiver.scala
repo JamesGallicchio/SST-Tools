@@ -3,6 +3,8 @@ package io.github.jamesgallicchio.sst.core
 import java.awt.image.BufferedImage
 import java.io._
 import java.util.zip.{ZipEntry, ZipFile, ZipOutputStream}
+import javafx.embed.swing.SwingFXUtils
+import javafx.scene.image.Image
 import javax.imageio.ImageIO
 
 import io.github.jamesgallicchio.sst.core.VzkEncoding._
@@ -37,7 +39,7 @@ object FontArchiver {
     val zip: ZipFile = new ZipFile(archive)
 
     zip.entries.asScala.foldLeft(
-      SSTFont("", 0, 0, Map.empty[Vowel, Seq[(Int, Int)]], Map.empty[VzkChar, Int], Map.empty[VzkChar, BufferedImage], null)
+      SSTFont("", 0, 0, Map.empty[Vowel, Seq[(Int, Int)]], Map.empty[VzkChar, Int], Map.empty[VzkChar, Image], null)
     ) { (font: SSTFont, entry: ZipEntry) =>
 
       entry.getName.replaceAll(".*/", "") match {
@@ -87,7 +89,7 @@ object FontArchiver {
             }
 
         // Character image file
-        case imageFile(iName) => val image = ImageIO.read(zip.getInputStream(entry))
+        case imageFile(iName) => val image = new Image(zip.getInputStream(entry))
           // Default image handling
           if (iName equalsIgnoreCase "default")
             font.copy(default = image)
@@ -124,7 +126,7 @@ object FontArchiver {
 
     font.images.foreach { case (char, image) =>
       zip.putNextEntry(new ZipEntry(s"${char.name}.png"))
-      ImageIO.write(image, "png", out)
+      ImageIO.write(SwingFXUtils.fromFXImage(image, null), "png", out)
       zip.closeEntry()
     }
 
