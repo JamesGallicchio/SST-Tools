@@ -1,0 +1,18 @@
+.key {
+    -fx-border-style: none, none, solid;
+    -fx-border-insets: 0em, 0.1em, 0.2em;
+    -fx-border-radius: 0.2em;
+    -fx-border-width: 0.1em, 0.1em, 0.1em;
+    -fx-border-color: #000, #000, #555;
+}
+
+.keyImg {
+    -fx-padding: 1em;
+}
+
+.scroll {
+    -fx-fit-to-width: true;
+    -fx-fit-to-height: true;
+    -fx-hbar-policy: never;
+    -fx-vbar-policy: as-needed;
+}

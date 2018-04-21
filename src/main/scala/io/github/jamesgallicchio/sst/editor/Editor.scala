@@ -1,5 +1,6 @@
 package io.github.jamesgallicchio.sst.editor
 
+import java.awt.{Dimension, Toolkit}
 import java.io.File
 
 import javafx.application.Application
@@ -19,11 +20,12 @@ class Editor extends Application {
   var file: Option[File] = None
   var seq: Seq[VzkChar] = Seq(O, V, LeanMark)//, A, Z, E, K, LineAlternation, N)
 
-  val font: SSTFont = FontArchiver.read(new File("/home/james/Downloads/Kyertey.sst"))
-
-
+  val font: SSTFont = FontArchiver.read(new File("Kyertey.sst"))
+  val style: String = getClass.getResource("/editor.css").toExternalForm
+  val screenSize: Dimension = Toolkit.getDefaultToolkit.getScreenSize
 
   val root = new BorderPane
+  root.getStylesheets.add(style)
 
   val group = new Group {
     private var charImages: Seq[ImageView] = Seq()
@@ -45,37 +47,26 @@ class Editor extends Application {
       iv.setY(y)
     }
   }
+  group.getStyleClass.add("group")
+  group.updateChars
 
   val scroll: ScrollPane = new ScrollPane(group)
-  scroll.setFitToWidth(true)
-  scroll.setFitToHeight(true)
-  scroll.setHbarPolicy(ScrollBarPolicy.NEVER)
+  scroll.getStyleClass.add("scroll")
+
   root.widthProperty().addListener(new ChangeListener[Number] {
     override def changed(observableValue: ObservableValue[_ <: Number], t: Number, t1: Number): Unit = group.updatePos
   })
   root.setCenter(scroll)
 
-  group.updateChars
-
-
-  val keyStyle =
-    """
-      |  -fx-border-style: dashed, none, solid;
-      |  -fx-border-insets: 0em, 0.1em, 0.2em;
-      |  -fx-border-radius: 0.2em;
-      |  -fx-border-width: 0.1em, 0.1em, 0.1em;
-      |  -fx-border-color: #000, #000, #555;
-      |  
-    """.stripMargin
-
   private def key(c: VzkChar): Node = {
     val iv = new ImageView(font.getImage(c))
     val pane = new StackPane(iv)
 
+    iv.getStyleClass.add("keyImg")
     iv.setPreserveRatio(true)
     iv.fitHeightProperty().bind(pane.heightProperty())
 
-    pane.setStyle(keyStyle)
+    pane.getStyleClass.add("key")
     pane.setOnMouseClicked { _ => seq :+= c; group.updateChars }
 
     pane
@@ -90,11 +81,11 @@ class Editor extends Application {
   private val bottom =
     Seq(LineAlternation, LeanMark)
 
-  val keyboard = new VBox(
-    {
+  val keyboard = new VBox({
       val h = new HBox(
         top.map(key):_*
       )
+      h.setSpacing(5)
       h
     }, {
       val g = new GridPane()
@@ -107,12 +98,20 @@ class Editor extends Application {
         GridPane.setColumnIndex(k, colnum)
         g.getChildren.add(k)
       }
+      g.setVgap(5)
+      g.setHgap(5)
       g
-    },
-    new HBox(
-      bottom.map(key):_*
-    )
+    }, {
+      val h = new HBox(
+        bottom.map(key): _*
+      )
+      h
+    }
   )
+
+  keyboard.setSpacing(5)
+  keyboard.prefHeightProperty.bind(root.heightProperty().multiply(0.25))
+  keyboard.setMinHeight(200)
 
   root.setBottom(keyboard)
 
