@@ -27,6 +27,7 @@ class Editor extends Application {
   val root = new BorderPane
   root.getStylesheets.add(style)
 
+  /*
   val group = new Group {
     private var charImages: Seq[ImageView] = Seq()
 
@@ -57,20 +58,24 @@ class Editor extends Application {
     override def changed(observableValue: ObservableValue[_ <: Number], t: Number, t1: Number): Unit = group.updatePos
   })
   root.setCenter(scroll)
+  */
 
-  private def key(c: VzkChar): Node = {
+  private def key(c: VzkChar): StackPane = {
     val iv = new ImageView(font.getImage(c))
     val pane = new StackPane(iv)
 
     iv.getStyleClass.add("keyImg")
     iv.setPreserveRatio(true)
     iv.fitHeightProperty().bind(pane.heightProperty())
+    iv.fitWidthProperty().bind(pane.widthProperty())
 
     pane.getStyleClass.add("key")
-    pane.setOnMouseClicked { _ => seq :+= c; group.updateChars }
+    pane.setMinSize(0, 0)
+    //pane.setOnMouseClicked { _ => seq :+= c; group.updateChars }
 
     pane
   }
+
 
   private val top =
     Seq(z0, z1, z2, z3, z4, z5, z6, z7, z8, z9, zX, zE)
@@ -80,6 +85,14 @@ class Editor extends Application {
   )
   private val bottom =
     Seq(LineAlternation, LeanMark)
+
+  val h = new HBox(
+    top.map(key):_*
+  )
+  h.setSpacing(5)
+  h
+
+  root.setCenter(h) /*
 
   val keyboard = new VBox({
       val h = new HBox(
@@ -113,52 +126,7 @@ class Editor extends Application {
   keyboard.prefHeightProperty.bind(root.heightProperty().multiply(0.25))
   keyboard.setMinHeight(200)
 
-  root.setBottom(keyboard)
-
-  /*
-  val kb = new GridPane
-  kb.setHgap(5)
-  kb.setVgap(5)
-  kb.prefHeightProperty().bind(root.heightProperty().multiply(0.3))
-  kb.setMinHeight(300)
-  kb.prefWidthProperty().bind(root.prefWidthProperty())
-  kb.gridLinesVisibleProperty().set(true)
-  root.setBottom(kb)
-
-
-  val layout = Seq(
-    Seq(null, z0, z1, z2, z3, z4, z5, z6, z7, z8, z9, zX, zE),
-    //Seq(E, null, Ey, null)
-  ).map(_.zipWithIndex).zipWithIndex
-
-  for (_ <- 0 to 16) {
-    val c = new ColumnConstraints
-    c.prefWidthProperty().bind(kb.widthProperty().multiply(100/16.0))
-    kb.getColumnConstraints.add(c)
-  }
-  for (_ <- 0 to 5) {
-    val r = new RowConstraints
-    r.setPercentHeight(100.0/5)
-    kb.getRowConstraints.add(r)
-  }
-
-  for {
-    (row, rid) <- layout
-    (ch, cid) <- row
-
-    if ch != null
-
-    img <- Option(font.getImage(ch))
-    iv = new ImageView(img)
-    _= iv.setPreserveRatio(true)
-
-    pane = new StackPane(iv)
-    _= pane.setStyle(keyStyle)
-    _= pane.setOnMouseClicked { _ => seq :+= ch; group.updateChars }
-
-    _= GridPane.setRowIndex(pane, rid)
-    _= GridPane.setColumnIndex(pane, cid)
-  } kb.getChildren.add(pane) */
+  root.setBottom(keyboard)*/
 
   override def start(stage: Stage): Unit = {
     stage.setScene(new Scene(root, 2000, 1500))
